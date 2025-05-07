@@ -20,33 +20,70 @@ class FarmerController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'validation_errors' => $validator->errors()
+            ], 422);
         }
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'phone' => $request->phone,
-            'role' => 'farmer',
-        ]);
+        try {
+            $farmerAccount = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'phone' => $request->phone,
+                'role' => 'farmer',
+            ]);
 
-        return response()->json([
-            'message' => 'Farmer registered successfully',
-            'user' => $user
-        ], 201);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Farmer account created successfully',
+                'farmer_account' => $farmerAccount
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to create farmer account',
+                'error_details' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function index()
     {
-        $farmers = User::where('role', 'farmer')->get();
-        return response()->json(['farmers' => $farmers]);
+        try {
+            $farmerAccounts = User::where('role', 'farmer')->get();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Farmer accounts retrieved successfully',
+                'farmer_accounts' => $farmerAccounts
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve farmer accounts',
+                'error_details' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function show($id)
     {
-        $farmer = User::where('role', 'farmer')->findOrFail($id);
-        return response()->json(['farmer' => $farmer]);
+        try {
+            $farmerAccount = User::where('role', 'farmer')->findOrFail($id);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Farmer account retrieved successfully',
+                'farmer_account' => $farmerAccount
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve farmer account',
+                'error_details' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function store(Request $request)
@@ -74,16 +111,43 @@ class FarmerController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'validation_errors' => $validator->errors()
+            ], 422);
         }
 
-        $farmer->update($request->all());
-        return response()->json($farmer);
+        try {
+            $farmer->update($request->all());
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Farmer account updated successfully',
+                'farmer_account' => $farmer
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update farmer account',
+                'error_details' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function destroy(User $farmer)
     {
-        $farmer->delete();
-        return response()->json(null, 204);
+        try {
+            $farmer->delete();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Farmer account deleted successfully'
+            ], 204);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete farmer account',
+                'error_details' => $e->getMessage()
+            ], 500);
+        }
     }
 } 

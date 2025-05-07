@@ -20,11 +20,15 @@ class AdminController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'validation_errors' => $validator->errors()
+            ], 422);
         }
 
         try {
-            $admin = User::create([
+            $administratorAccount = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
@@ -33,20 +37,34 @@ class AdminController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Admin user created successfully',
-                'admin' => $admin
+                'status' => 'success',
+                'message' => 'Administrator account created successfully',
+                'administrator' => $administratorAccount
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error creating admin user',
-                'error' => $e->getMessage()
+                'status' => 'error',
+                'message' => 'Failed to create administrator account',
+                'error_details' => $e->getMessage()
             ], 500);
         }
     }
 
     public function listAdmins()
     {
-        $admins = User::where('role', 'admin')->get();
-        return response()->json(['admins' => $admins]);
+        try {
+            $administrators = User::where('role', 'admin')->get();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Administrators retrieved successfully',
+                'administrators' => $administrators
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve administrators',
+                'error_details' => $e->getMessage()
+            ], 500);
+        }
     }
 } 

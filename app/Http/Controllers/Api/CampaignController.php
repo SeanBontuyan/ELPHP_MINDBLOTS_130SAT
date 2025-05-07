@@ -14,12 +14,13 @@ class CampaignController extends Controller
     public function index()
     {
         try {
-            $campaigns = Campaign::with(['project', 'investments'])->get();
-            return response()->json(['campaigns' => $campaigns]);
+            $fundingInitiatives = Campaign::with(['project', 'investments'])->get();
+            return response()->json(['funding_initiatives' => $fundingInitiatives]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Failed to fetch campaigns',
-                'error' => 'Unable to retrieve campaign data. Please try again.'
+                'status' => 'error',
+                'message' => 'Failed to retrieve funding initiatives',
+                'error_details' => 'Unable to fetch initiative data. Please try again.'
             ], 500);
         }
     }
@@ -27,23 +28,24 @@ class CampaignController extends Controller
     public function show($id)
     {
         try {
-            $campaign = Campaign::with(['project', 'investments'])->findOrFail($id);
-            return response()->json(['campaign' => $campaign]);
+            $fundingInitiative = Campaign::with(['project', 'investments'])->findOrFail($id);
+            return response()->json(['funding_initiative' => $fundingInitiative]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Campaign not found',
-                'error' => 'The requested campaign does not exist.'
+                'status' => 'error',
+                'message' => 'Initiative not found',
+                'error_details' => 'The requested funding initiative does not exist.'
             ], 404);
         }
     }
 
     public function store(Request $request)
     {
-        // Check if user is a farmer
         if ($request->user()->role !== 'farmer') {
             return response()->json([
-                'message' => 'Unauthorized',
-                'error' => 'Only farmers can create campaigns.'
+                'status' => 'error',
+                'message' => 'Access denied',
+                'error_details' => 'Only farmers can create funding initiatives.'
             ], 403);
         }
 
@@ -59,14 +61,14 @@ class CampaignController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'validation_errors' => $validator->errors()
             ], 422);
         }
 
         try {
-            // Create the project
-            $project = Project::create([
+            $agriculturalProject = Project::create([
                 'name' => $request->project_name,
                 'description' => $request->project_description,
                 'location' => $request->project_location,
@@ -77,114 +79,121 @@ class CampaignController extends Controller
                 'farmer_id' => $request->user()->id,
             ]);
 
-            if (!$project) {
-                throw new \Exception('Failed to create project');
+            if (!$agriculturalProject) {
+                throw new \Exception('Failed to create agricultural project');
             }
 
-            // Create the campaign
-            $campaign = Campaign::create([
-                'project_id' => $project->id,
+            $fundingInitiative = Campaign::create([
+                'project_id' => $agriculturalProject->id,
                 'target_amount' => $request->project_capital,
                 'start_date' => now(),
                 'end_date' => now()->addMonths($request->project_duration),
                 'status' => 'pending',
             ]);
 
-            if (!$campaign) {
-                throw new \Exception('Failed to create campaign');
+            if (!$fundingInitiative) {
+                throw new \Exception('Failed to create funding initiative');
             }
 
             return response()->json([
-                'message' => 'Campaign created successfully',
-                'campaign' => $campaign->load('project')
+                'status' => 'success',
+                'message' => 'Funding initiative created successfully',
+                'funding_initiative' => $fundingInitiative->load('project')
             ], 201);
         } catch (\Exception $e) {
-            \Log::error('Campaign creation failed: ' . $e->getMessage());
+            \Log::error('Funding initiative creation failed: ' . $e->getMessage());
             \Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
-                'message' => 'Failed to create campaign',
-                'error' => $e->getMessage()
+                'status' => 'error',
+                'message' => 'Failed to create funding initiative',
+                'error_details' => $e->getMessage()
             ], 500);
         }
     }
 
     public function approve($id)
     {
-        // Check if user is an admin
         if (auth()->user()->role !== 'admin') {
             return response()->json([
-                'message' => 'Unauthorized',
-                'error' => 'Only admins can approve campaigns.'
+                'status' => 'error',
+                'message' => 'Access denied',
+                'error_details' => 'Only administrators can approve funding initiatives.'
             ], 403);
         }
 
         try {
-            $campaign = Campaign::findOrFail($id);
+            $fundingInitiative = Campaign::findOrFail($id);
             
-            if ($campaign->status === 'active') {
+            if ($fundingInitiative->status === 'active') {
                 return response()->json([
+                    'status' => 'error',
                     'message' => 'Invalid operation',
-                    'error' => 'Campaign is already approved.'
+                    'error_details' => 'Funding initiative is already approved.'
                 ], 400);
             }
 
-            $campaign->status = 'active';
-            $campaign->save();
+            $fundingInitiative->status = 'active';
+            $fundingInitiative->save();
 
             return response()->json([
-                'message' => 'Campaign approved successfully',
-                'campaign' => $campaign
+                'status' => 'success',
+                'message' => 'Funding initiative approved successfully',
+                'funding_initiative' => $fundingInitiative
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Failed to approve campaign',
-                'error' => 'Unable to approve campaign. Please try again.'
+                'status' => 'error',
+                'message' => 'Failed to approve funding initiative',
+                'error_details' => 'Unable to approve initiative. Please try again.'
             ], 500);
         }
     }
 
     public function reject($id)
     {
-        // Check if user is an admin
         if (auth()->user()->role !== 'admin') {
             return response()->json([
-                'message' => 'Unauthorized',
-                'error' => 'Only admins can reject campaigns.'
+                'status' => 'error',
+                'message' => 'Access denied',
+                'error_details' => 'Only administrators can reject funding initiatives.'
             ], 403);
         }
 
         try {
-            $campaign = Campaign::findOrFail($id);
+            $fundingInitiative = Campaign::findOrFail($id);
             
-            if ($campaign->status === 'rejected') {
+            if ($fundingInitiative->status === 'rejected') {
                 return response()->json([
+                    'status' => 'error',
                     'message' => 'Invalid operation',
-                    'error' => 'Campaign is already rejected.'
+                    'error_details' => 'Funding initiative is already rejected.'
                 ], 400);
             }
 
-            $campaign->status = 'rejected';
-            $campaign->save();
+            $fundingInitiative->status = 'rejected';
+            $fundingInitiative->save();
 
             return response()->json([
-                'message' => 'Campaign rejected successfully',
-                'campaign' => $campaign
+                'status' => 'success',
+                'message' => 'Funding initiative rejected successfully',
+                'funding_initiative' => $fundingInitiative
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Failed to reject campaign',
-                'error' => 'Unable to reject campaign. Please try again.'
+                'status' => 'error',
+                'message' => 'Failed to reject funding initiative',
+                'error_details' => 'Unable to reject initiative. Please try again.'
             ], 500);
         }
     }
 
     public function fund(Request $request, $id)
     {
-        // Check if user is an investor
         if (auth()->user()->role !== 'investor') {
             return response()->json([
-                'message' => 'Unauthorized',
-                'error' => 'Only investors can fund campaigns.'
+                'status' => 'error',
+                'message' => 'Access denied',
+                'error_details' => 'Only investors can fund initiatives.'
             ], 403);
         }
 
@@ -194,31 +203,33 @@ class CampaignController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'validation_errors' => $validator->errors()
             ], 422);
         }
 
         try {
-            $campaign = Campaign::findOrFail($id);
+            $fundingInitiative = Campaign::findOrFail($id);
 
-            if ($campaign->status !== 'active') {
+            if ($fundingInitiative->status !== 'active') {
                 return response()->json([
+                    'status' => 'error',
                     'message' => 'Invalid operation',
-                    'error' => 'Only active campaigns can be funded.'
+                    'error_details' => 'Only active funding initiatives can receive investments.'
                 ], 403);
             }
 
-            if (now()->gt($campaign->end_date)) {
+            if (now()->gt($fundingInitiative->end_date)) {
                 return response()->json([
+                    'status' => 'error',
                     'message' => 'Invalid operation',
-                    'error' => 'Campaign has ended.'
+                    'error_details' => 'Funding initiative has ended.'
                 ], 403);
             }
 
-            // Create the investment
             $investment = Investment::create([
-                'campaign_id' => $campaign->id,
+                'campaign_id' => $fundingInitiative->id,
                 'investor_id' => auth()->id(),
                 'amount' => $request->amount,
             ]);
@@ -228,16 +239,18 @@ class CampaignController extends Controller
             }
 
             return response()->json([
-                'message' => 'Campaign funded successfully',
+                'status' => 'success',
+                'message' => 'Investment successful',
                 'investment' => $investment,
-                'campaign' => $campaign->load('investments')
+                'funding_initiative' => $fundingInitiative->load('investments')
             ]);
         } catch (\Exception $e) {
-            \Log::error('Campaign funding failed: ' . $e->getMessage());
+            \Log::error('Investment failed: ' . $e->getMessage());
             \Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
-                'message' => 'Failed to fund campaign',
-                'error' => $e->getMessage()
+                'status' => 'error',
+                'message' => 'Failed to process investment',
+                'error_details' => $e->getMessage()
             ], 500);
         }
     }

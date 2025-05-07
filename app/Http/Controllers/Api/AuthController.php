@@ -23,13 +23,14 @@ class AuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'validation_errors' => $validator->errors()
             ], 422);
         }
 
         try {
-            $user = User::create([
+            $userAccount = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
@@ -37,39 +38,40 @@ class AuthController extends Controller
                 'role' => $request->role,
             ]);
 
-            // Create the corresponding farmer or investor record
             if ($request->role === 'farmer') {
-                $farmer = \App\Models\Farmer::create([
+                $farmerProfile = \App\Models\Farmer::create([
                     'farmer_fname' => $request->name,
                     'farmer_lname' => $request->name,
                     'farmer_contact' => $request->contact ?? '',
                 ]);
-                $user->userable()->associate($farmer);
+                $userAccount->userable()->associate($farmerProfile);
             } else {
-                $investor = \App\Models\Investor::create([
+                $investorProfile = \App\Models\Investor::create([
                     'investor_name' => $request->name,
                     'investor_contact_no' => $request->contact ?? '',
                     'investor_budget_range' => $request->budget_range ?? '0-0',
                     'investor_type' => $request->investor_type ?? 'individual',
                 ]);
-                $user->userable()->associate($investor);
+                $userAccount->userable()->associate($investorProfile);
             }
 
-            $user->save();
+            $userAccount->save();
 
-            $token = $user->createToken('auth_token')->plainTextToken;
+            $accessToken = $userAccount->createToken('auth_token')->plainTextToken;
 
             return response()->json([
-                'message' => 'Registration successful',
-                'user' => $user,
-                'token' => $token,
+                'status' => 'success',
+                'message' => 'Account created successfully',
+                'user_account' => $userAccount,
+                'access_token' => $accessToken,
                 'token_type' => 'Bearer',
                 'expires_in' => config('sanctum.expiration', 60 * 24 * 7)
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Registration failed',
-                'error' => 'Unable to create user account. Please try again.'
+                'error_details' => 'Unable to create user account. Please try again.'
             ], 500);
         }
     }
@@ -83,38 +85,37 @@ class AuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'validation_errors' => $validator->errors()
             ], 422);
         }
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json([
-                'message' => 'Invalid credentials',
-                'error' => 'The provided credentials are incorrect.'
-            ], 401);
-        }
-
         try {
-            $user = User::where('email', $request->email)->first();
-            
-            // Revoke existing tokens
-            $user->tokens()->delete();
-            
-            // Create new token
-            $token = $user->createToken('auth_token')->plainTextToken;
+            if (!Auth::attempt($request->only('email', 'password'))) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Authentication failed',
+                    'error_details' => 'Invalid credentials provided.'
+                ], 401);
+            }
+
+            $userAccount = User::where('email', $request->email)->firstOrFail();
+            $accessToken = $userAccount->createToken('auth_token')->plainTextToken;
 
             return response()->json([
+                'status' => 'success',
                 'message' => 'Login successful',
-                'user' => $user,
-                'token' => $token,
+                'user_account' => $userAccount,
+                'access_token' => $accessToken,
                 'token_type' => 'Bearer',
                 'expires_in' => config('sanctum.expiration', 60 * 24 * 7)
             ]);
         } catch (\Exception $e) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Login failed',
-                'error' => 'Unable to process login. Please try again.'
+                'error_details' => 'Unable to authenticate user. Please try again.'
             ], 500);
         }
     }
@@ -124,13 +125,14 @@ class AuthController extends Controller
         try {
             $request->user()->currentAccessToken()->delete();
             return response()->json([
-                'message' => 'Logged out successfully',
-                'info' => 'Your session has been terminated.'
+                'status' => 'success',
+                'message' => 'Successfully logged out'
             ]);
         } catch (\Exception $e) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Logout failed',
-                'error' => 'Unable to terminate your session. Please try again.'
+                'error_details' => 'Unable to logout. Please try again.'
             ], 500);
         }
     }
